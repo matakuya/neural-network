@@ -3,18 +3,25 @@
 #include <math.h>
 #include <time.h>
 
-#define LETTER_NUM 100
+#define LETTER_NUM 1
 #define LETTER_SIZE 64
 #define INPUT_SIZE 64
 #define MIDDLE_SIZE 16
 #define OUTPUT_SIZE 14
 
+// 学習定数
+#define ETA 0.1
+// 安定化定数
+#define ALPHA 0.1
+
 // Struct {
 
 // 重さを格納する
 typedef struct Weight {
-  double current_value;
-  double next_value;
+  // 重み
+  double value;
+  // 更新した量
+  double delta_value;
 } weight_s;
 
 // } Struct
@@ -44,7 +51,7 @@ int fetch(double input[LETTER_NUM][INPUT_SIZE]) {
   }
 
   // 一文字ずつ取り出す
-  for(int letter_num = 0; letter_num < 100; letter_num++) {
+  for(int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
     for(int row_num = 0; row_num < LETTER_SIZE; row_num++ ) {
       fgets(row, 100, fp);
       for (int column_num = 0; column_num < LETTER_SIZE; column_num++) {
@@ -60,7 +67,7 @@ int fetch(double input[LETTER_NUM][INPUT_SIZE]) {
   }
 
   // メッシュ特徴量を求める
-  for (int letter_num = 0; letter_num < 100; letter_num++) {
+  for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
     for(int i = 0; i < INPUT_SIZE; i++) {
       input[letter_num][i] = 1.0 * input[letter_num][i] / INPUT_SIZE;
       // printf("%2d:%6.3lf\n", i, input[letter_num][i]);
@@ -75,12 +82,10 @@ int fetch(double input[LETTER_NUM][INPUT_SIZE]) {
 int init_weight(int before_size, int after_size, weight_s weight[before_size][after_size]) {
   for (int before_num = 0; before_num < before_size; before_num++) {
     for(int after_num = 0; after_num < after_size; after_num++) {
-      weight[before_num][after_num].current_value = generate_rand();
-      // weight[before_num][after_num].current_value = u_rand();
-      // printf("%6.3lf ", weight[before_num][after_num].current_value);
+      weight[before_num][after_num].value = generate_rand();
+      weight[before_num][after_num].delta_value = 0;
     }
   }
-
   return 0;
 }
 
@@ -95,8 +100,8 @@ int forward(
   for (int next_num = 0; next_num < next_unit_num; next_num++) {
     printf("next:%d\n", next_num);
     for (int current_num = 0; current_num < current_unit_num; current_num++) {
-      next_layer[next_num] += weight[current_num][next_num].current_value * current_layer[current_num];
-      printf("%6.3lf(+%6.3lf), ", next_layer[next_num], weight[current_num][next_num].current_value * current_layer[current_num]);
+      next_layer[next_num] += weight[current_num][next_num].value * current_layer[current_num];
+      printf("%6.3lf(+%6.3lf), ", next_layer[next_num], weight[current_num][next_num].value * current_layer[current_num]);
     }
     next_layer[next_num] = sigmoid(1, next_layer[next_num]);
     printf("%6.3lf\n\n", next_layer[next_num]);
@@ -104,15 +109,47 @@ int forward(
   return 0;
 }
 
-// 逆方向の学習を行う
-int backward() {
+int update_output_weight(
+  double output_hat[OUTPUT_SIZE],
+  double middle[MIDDLE_SIZE],
+  double output[OUTPUT_SIZE],
+  weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE]
+) {
+  for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
+    for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
+      weight[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight[middle_num][output_num].delta_value;
+      weight[middle_num][output_num].value += weight[middle_num][output_num].delta_value;
+    }
+  }
+  return 0;
+}
+
+int update_middle_weight(
+  double output_hat[OUTPUT_SIZE],
+  double input[INPUT_SIZE],
+  double middle[MIDDLE_SIZE],
+  double output[OUTPUT_SIZE],
+  weight_s weight_midle[INPUT_SIZE][MIDDLE_SIZE],
+  weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE]
+) {
+  for (int input_num = 0; input_num < INPUT_SIZE; input_num++) {
+    double sigma_middle = 0;
+    for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
+      for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
+        sigma_middle += (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num])
+      }
+    }
+    weight[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight[middle_num][output_num].delta_value;
+    weight[middle_num][output_num].value += weight[middle_num][output_num].delta_value;
+  }
   return 0;
 }
 
 int main() {
-  puts("hola!");
-
   srand((unsigned int)time(NULL));
+
+  // 正解データ
+  double output_hat[OUTPUT_SIZE] = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
   double input[LETTER_NUM][INPUT_SIZE] = {{0}};
   double middle[MIDDLE_SIZE] = {0};
