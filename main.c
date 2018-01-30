@@ -117,8 +117,8 @@ int update_output_weight(
 ) {
   for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
     for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
-      weight[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight[middle_num][output_num].delta_value;
-      weight[middle_num][output_num].value += weight[middle_num][output_num].delta_value;
+      weight_output[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight_output[middle_num][output_num].delta_value;
+      weight_output[middle_num][output_num].value += weight_output[middle_num][output_num].delta_value;
     }
   }
   return 0;
@@ -129,18 +129,18 @@ int update_middle_weight(
   double input[INPUT_SIZE],
   double middle[MIDDLE_SIZE],
   double output[OUTPUT_SIZE],
-  weight_s weight_midle[INPUT_SIZE][MIDDLE_SIZE],
+  weight_s weight_middle[INPUT_SIZE][MIDDLE_SIZE],
   weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE]
 ) {
   for (int input_num = 0; input_num < INPUT_SIZE; input_num++) {
     double sigma_middle = 0;
     for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
       for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
-        sigma_middle += (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num])
+        sigma_middle += (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]);
       }
+      weight_middle[input_num][middle_num].delta_value = ETA * middle[middle_num] * (1 - middle[middle_num]) * input[input_num] * sigma_middle + ALPHA * weight_middle[input_num][middle_num].delta_value;
+      weight_middle[input_num][middle_num].value += weight_middle[input_num][middle_num].delta_value;
     }
-    weight[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight[middle_num][output_num].delta_value;
-    weight[middle_num][output_num].value += weight[middle_num][output_num].delta_value;
   }
   return 0;
 }
@@ -149,7 +149,7 @@ int main() {
   srand((unsigned int)time(NULL));
 
   // 正解データ
-  double output_hat[OUTPUT_SIZE] = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+  double output_hat[OUTPUT_SIZE] = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
   double input[LETTER_NUM][INPUT_SIZE] = {{0}};
   double middle[MIDDLE_SIZE] = {0};
@@ -165,6 +165,9 @@ int main() {
 
   forward(INPUT_SIZE, MIDDLE_SIZE, input[0], middle, weight_middle);
   forward(MIDDLE_SIZE, OUTPUT_SIZE, middle, output, weight_output);
+
+  update_output_weight(output_hat, middle, output, weight_output);
+  update_middle_weight(output_hat, input[0], middle, output, weight_middle, weight_output);
 
 
   return 0;
