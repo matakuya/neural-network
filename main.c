@@ -11,9 +11,11 @@
 #define OUTPUT_SIZE 14
 
 // 学習定数
-#define ETA 0.1
+#define ETA 0.5
 // 安定化定数
-#define ALPHA 0.1
+#define ALPHA 0.7
+// 平均二乗誤差のしきい値
+#define ERROR_THRESHOLD 0.7
 
 // Struct {
 
@@ -44,6 +46,15 @@ double square_error(double output[OUTPUT_SIZE], double output_hat[OUTPUT_SIZE]) 
     output_sum += (output_hat[output_num] - output[output_num]) * (output_hat[output_num] - output[output_num]);
   }
   return output_sum / OUTPUT_SIZE;
+}
+
+int print_array(int num, double array[num]) {
+  printf("{");
+  for (int i = 0; i < num; i++) {
+    printf("%lf, ", array[i]);
+  }
+  printf("}\n");
+  return 0;
 }
 
 // } Util
@@ -168,7 +179,7 @@ int main() {
   double output[OUTPUT_SIZE] = {0};
   weight_s weight_middle[INPUT_SIZE][MIDDLE_SIZE];
   weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE];
-  double error = 0;
+  double error = 100;
 
   // ニューラルネットワークテスト用
   char *test_file_name = "Data/hira0_00T.dat";
@@ -182,23 +193,27 @@ int main() {
   init_weight(INPUT_SIZE, MIDDLE_SIZE, weight_middle);
   init_weight(MIDDLE_SIZE, OUTPUT_SIZE, weight_output);
 
-  // 入力パターン個数分の処理
-  for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
-    // (1)
-    forward(INPUT_SIZE, MIDDLE_SIZE, input[letter_num], middle, weight_middle);
-    // (2)
-    forward(MIDDLE_SIZE, OUTPUT_SIZE, middle, output, weight_output);
-    // ここで二乗誤差の中間結果を計算しておく
-    error += square_error(output, output_hat);
-    printf("Square Error:%lf\n", error);
-    // (5)
-    update_output_weight(output_hat, middle, output, weight_output);
-    // (6)
-    update_middle_weight(output_hat, input[letter_num], middle, output, weight_middle, weight_output);
+  while (error >= ERROR_THRESHOLD) {
+    error = 0;
+    // 入力パターン個数分の処理
+    for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
+      // (1)
+      forward(INPUT_SIZE, MIDDLE_SIZE, input[letter_num], middle, weight_middle);
+      // (2)
+      forward(MIDDLE_SIZE, OUTPUT_SIZE, middle, output, weight_output);
+      // ここで二乗誤差の中間結果を計算しておく
+      print_array(OUTPUT_SIZE, output);
+      double tmp_error = square_error(output, output_hat);
+      error += tmp_error;
+      printf("Square Error:%lf\n", tmp_error);
+      // (5)
+      update_output_weight(output_hat, middle, output, weight_output);
+      // (6)
+      update_middle_weight(output_hat, input[letter_num], middle, output, weight_middle, weight_output);
+    }
+    error = error / LETTER_NUM;
+    printf("Final Square Error:%lf\n", error);
   }
-  error = error / LETTER_NUM;
-  printf("Square Error:%lf\n", error);
-
 
 
 
