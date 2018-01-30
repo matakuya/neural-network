@@ -60,7 +60,7 @@ int print_array(int num, double array[num]) {
 // } Util
 
 // ファイルから文字データを取得する
-int fetch(double input[LETTER_NUM][INPUT_SIZE], char *file_name) {
+int fetch(double input[LETTER_NUM][INPUT_SIZE + 1], char *file_name) {
   char row[LETTER_SIZE];
   FILE *fp = fopen(file_name, "r");
 
@@ -91,6 +91,8 @@ int fetch(double input[LETTER_NUM][INPUT_SIZE], char *file_name) {
       input[letter_num][i] = 1.0 * input[letter_num][i] / INPUT_SIZE;
       // printf("%2d:%6.3lf\n", i, input[letter_num][i]);
     }
+    // 常に1を出力する入力層のユニット
+    input[letter_num][INPUT_SIZE] = 1;
   }
 
   fclose(fp);
@@ -131,11 +133,11 @@ int forward(
 // 出力層の逆伝播
 int update_output_weight(
   double output_hat[OUTPUT_SIZE],
-  double middle[MIDDLE_SIZE],
+  double middle[MIDDLE_SIZE + 1],
   double output[OUTPUT_SIZE],
-  weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE]
+  weight_s weight_output[MIDDLE_SIZE + 1][OUTPUT_SIZE]
 ) {
-  for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
+  for (int middle_num = 0; middle_num < MIDDLE_SIZE + 1; middle_num++) {
     for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
       weight_output[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight_output[middle_num][output_num].delta_value;
       weight_output[middle_num][output_num].value += weight_output[middle_num][output_num].delta_value;
@@ -147,13 +149,13 @@ int update_output_weight(
 // 隠れ層の逆伝播
 int update_middle_weight(
   double output_hat[OUTPUT_SIZE],
-  double input[INPUT_SIZE],
-  double middle[MIDDLE_SIZE],
+  double input[INPUT_SIZE + 1],
+  double middle[MIDDLE_SIZE + 1],
   double output[OUTPUT_SIZE],
-  weight_s weight_middle[INPUT_SIZE][MIDDLE_SIZE],
-  weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE]
+  weight_s weight_middle[INPUT_SIZE + 1][MIDDLE_SIZE],
+  weight_s weight_output[MIDDLE_SIZE + 1][OUTPUT_SIZE]
 ) {
-  for (int input_num = 0; input_num < INPUT_SIZE; input_num++) {
+  for (int input_num = 0; input_num < INPUT_SIZE + 1; input_num++) {
     double sigma_middle = 0;
     for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
       for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
@@ -174,33 +176,41 @@ int main() {
 
   // ニューラルネットワーク学習用
   char *train_file_name = "Data/hira0_00L.dat";
-  double input[LETTER_NUM][INPUT_SIZE] = {{0}};
-  double middle[MIDDLE_SIZE] = {0};
+  double input[LETTER_NUM][INPUT_SIZE + 1] = {{0}};
+  double middle[MIDDLE_SIZE + 1] = {0};
+  // 常に1を出力する中間層のユニット
+  middle[MIDDLE_SIZE] = 1;
   double output[OUTPUT_SIZE] = {0};
   weight_s weight_middle[INPUT_SIZE][MIDDLE_SIZE];
   weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE];
+  // 大きな値ならなんでもいい
   double error = 100;
 
   // ニューラルネットワークテスト用
   char *test_file_name = "Data/hira0_00T.dat";
-  double test_input[LETTER_NUM][INPUT_SIZE] = {{0}};
+  double test_input[LETTER_NUM][INPUT_SIZE + 1] = {{0}};
 
   // ファイルから読み込み
   fetch(input, train_file_name);
   fetch(test_input, test_file_name);
 
-  // 重み初期化
-  init_weight(INPUT_SIZE, MIDDLE_SIZE, weight_middle);
-  init_weight(MIDDLE_SIZE, OUTPUT_SIZE, weight_output);
+  print_array(INPUT_SIZE + 1, input[0]);
+  print_array(MIDDLE_SIZE + 1, middle);
 
+  // 重み初期化
+  // できればガウスとかでやりたい
+  init_weight(INPUT_SIZE + 1, MIDDLE_SIZE, weight_middle);
+  init_weight(MIDDLE_SIZE + 1, OUTPUT_SIZE, weight_output);
+
+  // しきい値以下の誤差になるまで学習をする
   while (error >= ERROR_THRESHOLD) {
     error = 0;
     // 入力パターン個数分の処理
     for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
       // (1)
-      forward(INPUT_SIZE, MIDDLE_SIZE, input[letter_num], middle, weight_middle);
+      forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[letter_num], middle, weight_middle);
       // (2)
-      forward(MIDDLE_SIZE, OUTPUT_SIZE, middle, output, weight_output);
+      forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
       // ここで二乗誤差の中間結果を計算しておく
       print_array(OUTPUT_SIZE, output);
       double tmp_error = square_error(output, output_hat);
@@ -210,6 +220,8 @@ int main() {
       update_output_weight(output_hat, middle, output, weight_output);
       // (6)
       update_middle_weight(output_hat, input[letter_num], middle, output, weight_middle, weight_output);
+      // print_array(INPUT_SIZE + 1, input[letter_num]);
+      // print_array(MIDDLE_SIZE + 1, middle);
     }
     error = error / LETTER_NUM;
     printf("Final Square Error:%lf\n", error);
