@@ -17,7 +17,7 @@
 // 入力層ユニット
 #define INPUT_SIZE 64
 // 中間層ユニット
-#define MIDDLE_SIZE 32
+#define MIDDLE_SIZE 30
 // 出力層ユニット
 // あ〜との20文字
 #define OUTPUT_SIZE 20
@@ -26,14 +26,14 @@
 // 筆記者の数
 #define WRITER_NUM 1
 // 筆記者の番号
-#define TRAIN_WRITER 1
-#define TEST_WRITER 0
+#define TRAIN_WRITER 0
+#define TEST_WRITER 1
 // テストデータのタイプ
-#define TEST_DATA_TYPE 'T'
+#define TEST_DATA_TYPE 'L'
 
 // 学習定数
-// #define ETA 0.75
-#define ETA 0.6
+#define ETA 0.75
+// #define ETA 0.6
 // 安定化定数
 // #define ALPHA 0.8
 #define ALPHA 0.3
@@ -237,10 +237,12 @@ int main() {
   if (writers == 2) {
     provide_data(input[0], 0, 'L');
     provide_data(input[1], 1, 'L');
+    provide_data(test_input[0], 0, test_data_type);
+    provide_data(test_input[1], 1, test_data_type);
   } else {
     provide_data(input[0], train_writer, 'L');
+    provide_data(test_input[0], test_writer, test_data_type);
   }
-  provide_data(test_input[0], test_writer, test_data_type);
 
   // 重み初期化
   init_weight(INPUT_SIZE + 1, MIDDLE_SIZE, weight_middle);
@@ -249,13 +251,12 @@ int main() {
   // しきい値以下の誤差になるまで学習をする
   while (error >= ERROR_THRESHOLD) {
     error = 0;
-    int writer_num = 0;
     // 入力パターン個数分の処理
     for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
       // 文字の種類ごと
       for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
         // 筆記者ごと
-        // for (int writer_num = 0; writer_num < writers; writer_num++) {
+        for (int writer_num = 0; writer_num < writers; writer_num++) {
           // 式(1)
           forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[writer_num][char_class][letter_num], middle, weight_middle);
           // 式(2)
@@ -267,56 +268,57 @@ int main() {
           update_output_weight(output_hat[char_class], middle, output, weight_output);
           // 式(6)
           update_middle_weight(output_hat[char_class], input[writer_num][char_class][letter_num], middle, output, weight_middle, weight_output);
-        // }
+        }
       }
     }
-    error = error / (LETTER_NUM * CHAR_CLASS);
+    error = error / (writers * LETTER_NUM * CHAR_CLASS);
     printf("Square Error:%lf\n", error);
   }
 
   // 識別する
-  // 固定
-  int writer_num = 0;
   // 正解数
   int correct = 0;
-  // 文字の種類ごと
-  for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-    // 分布確認用
-    int histgram[CHAR_CLASS] = {0};
+  // 筆記者ごと
+  for (int writer_num = 0; writer_num < writers; writer_num++) {
+    // 文字の種類ごと
+    for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
+      // 分布確認用
+      int histgram[CHAR_CLASS] = {0};
 
-    // 入力パターン個数分の処理
-    for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
-      // (1)
-      forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[writer_num][char_class][letter_num], middle, weight_middle);
-      // (2)
-      forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
+      // 入力パターン個数分の処理
+      for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
+        // (1)
+        forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[writer_num][char_class][letter_num], middle, weight_middle);
+        // (2)
+        forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
 
-      // 出力の中の最大値を求め，そのindexを識別結果とする
-      double max = 0;
-      int index = 0;
-      for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-        if(output[char_class] >= max) {
-          max = output[char_class];
-          index = char_class;
+        // 出力の中の最大値を求め，そのindexを識別結果とする
+        double max = 0;
+        int index = 0;
+        for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
+          if(output[char_class] >= max) {
+            max = output[char_class];
+            index = char_class;
+          }
+        }
+        histgram[index]++;
+      }
+
+      // 正解数のカウント
+      printf("Correct: %d (%d/%d){", char_class, histgram[char_class], LETTER_NUM);
+      for (int i = 0; i < CHAR_CLASS; i++) {
+        printf("'%d':%d, ", i, histgram[i]);
+        if(i == char_class) {
+          correct += histgram[i];
         }
       }
-      histgram[index]++;
+      printf("}\n");
     }
-
-    // 正解数のカウント
-    printf("Correct: %d (%d/%d){", char_class, histgram[char_class], LETTER_NUM);
-    for (int i = 0; i < CHAR_CLASS; i++) {
-      printf("'%d':%d, ", i, histgram[i]);
-      if(i == char_class) {
-        correct += histgram[i];
-      }
-    }
-    printf("}\n");
   }
   // 正解率
   printf("train_writer:%d, test_writer:%d, test_data_type:%c\n", train_writer, test_writer, test_data_type);
   printf("Correct: %d\n", correct);
-  printf("Accuracy Rate: %lf\n", 1.0 * correct / (CHAR_CLASS * LETTER_NUM));
+  printf("Accuracy Rate: %lf\n", 1.0 * correct / (writers * CHAR_CLASS * LETTER_NUM));
 
 
   return 0;
