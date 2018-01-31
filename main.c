@@ -22,9 +22,20 @@
 // あ〜との20文字
 #define OUTPUT_SIZE 20
 
+// ここを書き換えて実行する
+// 筆記者の数
+#define WRITER_NUM 1
+// 筆記者の番号
+#define TRAIN_WRITER 1
+#define TEST_WRITER 0
+// テストデータのタイプ
+#define TEST_DATA_TYPE 'T'
+
 // 学習定数
+// #define ETA 0.75
 #define ETA 0.6
 // 安定化定数
+// #define ALPHA 0.8
 #define ALPHA 0.3
 // 平均二乗誤差のしきい値
 #define ERROR_THRESHOLD 0.0005
@@ -192,7 +203,14 @@ int update_middle_weight(
   return 0;
 }
 
-int main(int argc, char *argv[]) {
+int main() {
+  int writers = WRITER_NUM;
+  int train_writer = TRAIN_WRITER;
+  int test_writer = TEST_WRITER;
+  char test_data_type = TEST_DATA_TYPE;
+
+  printf("train_writer:%d, test_writer:%d, test_data_type:%c\n", train_writer, test_writer, test_data_type);
+
   // 正解データ
   // 20 * 20
   double output_hat[CHAR_CLASS][OUTPUT_SIZE] = {{0}};
@@ -202,7 +220,7 @@ int main(int argc, char *argv[]) {
   }
 
   // ニューラルネットワーク学習用
-  double input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
+  double input[WRITER_NUM][CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{{0}}}};
   double middle[MIDDLE_SIZE + 1] = {0};
   // 常に1を出力する中間層のユニット初期化
   middle[MIDDLE_SIZE] = 1;
@@ -213,11 +231,16 @@ int main(int argc, char *argv[]) {
   double error = 100;
 
   // ニューラルネットワークテスト用
-  double test_input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
+  double test_input[1][CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{{0}}}};
 
   // 文字の種類ごとファイルから読み込み
-  provide_data(input, 0, 'L');
-  provide_data(test_input, 0, 'T');
+  if (writers == 2) {
+    provide_data(input[0], 0, 'L');
+    provide_data(input[1], 1, 'L');
+  } else {
+    provide_data(input[0], train_writer, 'L');
+  }
+  provide_data(test_input[0], test_writer, test_data_type);
 
   // 重み初期化
   init_weight(INPUT_SIZE + 1, MIDDLE_SIZE, weight_middle);
@@ -226,23 +249,25 @@ int main(int argc, char *argv[]) {
   // しきい値以下の誤差になるまで学習をする
   while (error >= ERROR_THRESHOLD) {
     error = 0;
-
+    int writer_num = 0;
     // 入力パターン個数分の処理
     for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
       // 文字の種類ごと
       for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-
-        // 式(1)
-        forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[char_class][letter_num], middle, weight_middle);
-        // 式(2)
-        forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
-        // ここで二乗誤差の中間結果を計算しておく
-        double tmp_error = square_error(output, output_hat[char_class]);
-        error += tmp_error;
-        // 式(5)
-        update_output_weight(output_hat[char_class], middle, output, weight_output);
-        // 式(6)
-        update_middle_weight(output_hat[char_class], input[char_class][letter_num], middle, output, weight_middle, weight_output);
+        // 筆記者ごと
+        // for (int writer_num = 0; writer_num < writers; writer_num++) {
+          // 式(1)
+          forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[writer_num][char_class][letter_num], middle, weight_middle);
+          // 式(2)
+          forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
+          // ここで二乗誤差の中間結果を計算しておく
+          double tmp_error = square_error(output, output_hat[char_class]);
+          error += tmp_error;
+          // 式(5)
+          update_output_weight(output_hat[char_class], middle, output, weight_output);
+          // 式(6)
+          update_middle_weight(output_hat[char_class], input[writer_num][char_class][letter_num], middle, output, weight_middle, weight_output);
+        // }
       }
     }
     error = error / (LETTER_NUM * CHAR_CLASS);
@@ -250,6 +275,8 @@ int main(int argc, char *argv[]) {
   }
 
   // 識別する
+  // 固定
+  int writer_num = 0;
   // 正解数
   int correct = 0;
   // 文字の種類ごと
@@ -260,7 +287,7 @@ int main(int argc, char *argv[]) {
     // 入力パターン個数分の処理
     for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
       // (1)
-      forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[char_class][letter_num], middle, weight_middle);
+      forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[writer_num][char_class][letter_num], middle, weight_middle);
       // (2)
       forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
 
@@ -287,6 +314,8 @@ int main(int argc, char *argv[]) {
     printf("}\n");
   }
   // 正解率
+  printf("train_writer:%d, test_writer:%d, test_data_type:%c\n", train_writer, test_writer, test_data_type);
+  printf("Correct: %d\n", correct);
   printf("Accuracy Rate: %lf\n", 1.0 * correct / (CHAR_CLASS * LETTER_NUM));
 
 
