@@ -1,3 +1,6 @@
+// 17w2083h
+// 牧野 拓也
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -14,17 +17,17 @@
 // 入力層ユニット
 #define INPUT_SIZE 64
 // 中間層ユニット
-#define MIDDLE_SIZE 30
+#define MIDDLE_SIZE 32
 // 出力層ユニット
 // あ〜との20文字
 #define OUTPUT_SIZE 20
 
 // 学習定数
-#define ETA 0.3
+#define ETA 0.6
 // 安定化定数
-#define ALPHA 0.2
+#define ALPHA 0.3
 // 平均二乗誤差のしきい値
-#define ERROR_THRESHOLD 20
+#define ERROR_THRESHOLD 0.005
 
 // Struct {
 
@@ -146,8 +149,8 @@ int update_output_weight(
   double output[OUTPUT_SIZE],
   weight_s weight_output[MIDDLE_SIZE + 1][OUTPUT_SIZE]
 ) {
-  for (int middle_num = 0; middle_num < MIDDLE_SIZE + 1; middle_num++) {
-    for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
+  for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
+    for (int middle_num = 0; middle_num < MIDDLE_SIZE + 1; middle_num++) {
       weight_output[middle_num][output_num].delta_value = ETA * (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * middle[middle_num] + ALPHA * weight_output[middle_num][output_num].delta_value;
       weight_output[middle_num][output_num].value += weight_output[middle_num][output_num].delta_value;
     }
@@ -164,11 +167,11 @@ int update_middle_weight(
   weight_s weight_middle[INPUT_SIZE + 1][MIDDLE_SIZE],
   weight_s weight_output[MIDDLE_SIZE + 1][OUTPUT_SIZE]
 ) {
-  for (int input_num = 0; input_num < INPUT_SIZE + 1; input_num++) {
+  for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
     double sigma_middle = 0;
-    for (int middle_num = 0; middle_num < MIDDLE_SIZE; middle_num++) {
+    for (int input_num = 0; input_num < INPUT_SIZE + 1; input_num++) {
       for(int output_num = 0; output_num < OUTPUT_SIZE; output_num++) {
-        sigma_middle += (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]);
+        sigma_middle += (output_hat[output_num] - output[output_num]) * output[output_num] * (1 - output[output_num]) * weight_output[middle_num][output_num].value;
       }
       weight_middle[input_num][middle_num].delta_value = ETA * middle[middle_num] * (1 - middle[middle_num]) * input[input_num] * sigma_middle + ALPHA * weight_middle[input_num][middle_num].delta_value;
       weight_middle[input_num][middle_num].value += weight_middle[input_num][middle_num].delta_value;
@@ -213,11 +216,11 @@ int main() {
   }
 
   // しきい値以下の誤差になるまで学習をする
-  for (int i = 0; i < 200; i++) {
-  // while (error >= ERROR_THRESHOLD) {
+  // for (int i = 0; i < 200; i++) {
+  while (error >= ERROR_THRESHOLD) {
     error = 0;
     // // 文字の種類ごと
-    // for (int char_class = 0; char_class < 2; char_class++) {
+    // for (int char_class = 7; char_class < 8; char_class++) {
     // // for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
     //   // 入力パターン個数分の処理
     //   for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
@@ -257,8 +260,8 @@ int main() {
   // 文字の種類ごと
   for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
     printf("----------------------------------------------------\n");
-    sprintf(test_file_name, "Data/hira0_%02dL.dat", char_class);
-    // sprintf(test_file_name, "Data/hira0_%02dT.dat", char_class);
+    // sprintf(test_file_name, "Data/hira0_%02dL.dat", char_class);
+    sprintf(test_file_name, "Data/hira0_%02dT.dat", char_class);
     // ファイルから読み込み
     fetch(test_input[char_class], test_file_name);
 
@@ -286,7 +289,7 @@ int main() {
       histgram[index]++;
     }
 
-    printf("Correct: %d (%d/%d){", histgram[char_class], LETTER_NUM, char_class);
+    printf("Correct: %d (%d/%d){", char_class, histgram[char_class], LETTER_NUM);
     for (int i = 0; i < CHAR_CLASS; i++) {
       printf("'%d':%d, ", i, histgram[i]);
     }
