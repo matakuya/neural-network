@@ -27,7 +27,7 @@
 // 安定化定数
 #define ALPHA 0.3
 // 平均二乗誤差のしきい値
-#define ERROR_THRESHOLD 0.005
+#define ERROR_THRESHOLD 0.0005
 
 // Struct {
 
@@ -180,7 +180,8 @@ int update_middle_weight(
   return 0;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+  // 乱数生成用
   srand((unsigned int)time(NULL));
 
   // 正解データ
@@ -189,67 +190,54 @@ int main() {
   // 正解データ作成
   for (int i = 0; i < CHAR_CLASS; i++) {
     output_hat[i][i] = 1;
-    // print_array(OUTPUT_SIZE, output_hat[i]);
   }
 
   // ニューラルネットワーク学習用
   char train_file_name[256] = {'\0'};
   double input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
   double middle[MIDDLE_SIZE + 1] = {0};
-  // 常に1を出力する中間層のユニット
+  // 常に1を出力する中間層のユニット初期化
   middle[MIDDLE_SIZE] = 1;
   double output[OUTPUT_SIZE] = {0};
   weight_s weight_middle[INPUT_SIZE][MIDDLE_SIZE];
   weight_s weight_output[MIDDLE_SIZE][OUTPUT_SIZE];
-  // 大きな値ならなんでもいい
+  // 大きな値ならなんでもいい．平均二乗誤差
   double error = 100;
+
+  // 文字の種類ごとファイルから読み込み
+  for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
+    sprintf(train_file_name, "Data/hira0_%02dL.dat", char_class);
+    fetch(input[char_class], train_file_name);
+  }
 
   // 重み初期化
   init_weight(INPUT_SIZE + 1, MIDDLE_SIZE, weight_middle);
   init_weight(MIDDLE_SIZE + 1, OUTPUT_SIZE, weight_output);
 
-  // 文字の種類ごと
-  for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-    sprintf(train_file_name, "Data/hira0_%02dL.dat", char_class);
-    // ファイルから読み込み
-    fetch(input[char_class], train_file_name);
-  }
-
   // しきい値以下の誤差になるまで学習をする
-  // for (int i = 0; i < 200; i++) {
   while (error >= ERROR_THRESHOLD) {
     error = 0;
-    // // 文字の種類ごと
-    // for (int char_class = 7; char_class < 8; char_class++) {
-    // // for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-    //   // 入力パターン個数分の処理
-    //   for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
 
     // 入力パターン個数分の処理
     for (int letter_num = 0; letter_num < LETTER_NUM; letter_num++) {
       // 文字の種類ごと
-      // for (int char_class = 0; char_class < 2; char_class++) {
       for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
 
-        // (1)
+        // 式(1)
         forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[char_class][letter_num], middle, weight_middle);
-        // (2)
+        // 式(2)
         forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
         // ここで二乗誤差の中間結果を計算しておく
-        // print_array(OUTPUT_SIZE, output);
         double tmp_error = square_error(output, output_hat[char_class]);
         error += tmp_error;
-        // printf("Square Error:%lf\n", tmp_error);
-        // (5)
+        // 式(5)
         update_output_weight(output_hat[char_class], middle, output, weight_output);
-        // (6)
+        // 式(6)
         update_middle_weight(output_hat[char_class], input[char_class][letter_num], middle, output, weight_middle, weight_output);
-        // print_array(INPUT_SIZE + 1, input[letter_num]);
-        // print_array(MIDDLE_SIZE + 1, middle);
       }
     }
     error = error / (LETTER_NUM * CHAR_CLASS);
-    printf("Final Square Error:%lf\n", error);
+    printf("Square Error:%lf\n", error);
   }
 
   // 識別する
@@ -257,9 +245,10 @@ int main() {
   char test_file_name[256] = {'\0'};
   double test_input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
 
+  // 正解数
+  int correct = 0;
   // 文字の種類ごと
   for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-    printf("----------------------------------------------------\n");
     // sprintf(test_file_name, "Data/hira0_%02dL.dat", char_class);
     sprintf(test_file_name, "Data/hira0_%02dT.dat", char_class);
     // ファイルから読み込み
@@ -274,9 +263,8 @@ int main() {
       forward(INPUT_SIZE + 1, MIDDLE_SIZE, input[char_class][letter_num], middle, weight_middle);
       // (2)
       forward(MIDDLE_SIZE + 1, OUTPUT_SIZE, middle, output, weight_output);
-      // print_array(OUTPUT_SIZE, output);
 
-      // 最大値を求める
+      // 出力の中の最大値を求め，そのindexを識別結果とする
       double max = 0;
       int index = 0;
       for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
@@ -285,16 +273,21 @@ int main() {
           index = char_class;
         }
       }
-
       histgram[index]++;
     }
 
+    // 正解数のカウント
     printf("Correct: %d (%d/%d){", char_class, histgram[char_class], LETTER_NUM);
     for (int i = 0; i < CHAR_CLASS; i++) {
       printf("'%d':%d, ", i, histgram[i]);
+      if(i == char_class) {
+        correct += histgram[i];
+      }
     }
     printf("}\n");
   }
+  // 正解率
+  printf("Accuracy Rate: %lf\n", 1.0 * correct / (CHAR_CLASS * LETTER_NUM));
 
 
   return 0;
