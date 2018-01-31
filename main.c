@@ -35,7 +35,7 @@
 typedef struct Weight {
   // 重み
   double value;
-  // 更新した量
+  // 更新量
   double delta_value;
 } weight_s;
 
@@ -44,6 +44,7 @@ typedef struct Weight {
 // Util {
 
 double generate_rand() {
+  srand((unsigned int)time(NULL));
   return rand() / (1.0 + RAND_MAX);
 }
 
@@ -108,6 +109,17 @@ int fetch(double input[LETTER_NUM][INPUT_SIZE + 1], char *file_name) {
   }
 
   fclose(fp);
+  return 0;
+}
+
+// 文字ごとのデータ取得
+int provide_data(double input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1], int writer_num, char data_type) {
+  char file_name[256] = {'\0'};
+  // 文字の種類ごとファイルから読み込み
+  for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
+    sprintf(file_name, "Data/hira%d_%02d%c.dat", writer_num, char_class, data_type);
+    fetch(input[char_class], file_name);
+  }
   return 0;
 }
 
@@ -181,9 +193,6 @@ int update_middle_weight(
 }
 
 int main(int argc, char *argv[]) {
-  // 乱数生成用
-  srand((unsigned int)time(NULL));
-
   // 正解データ
   // 20 * 20
   double output_hat[CHAR_CLASS][OUTPUT_SIZE] = {{0}};
@@ -193,7 +202,6 @@ int main(int argc, char *argv[]) {
   }
 
   // ニューラルネットワーク学習用
-  char train_file_name[256] = {'\0'};
   double input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
   double middle[MIDDLE_SIZE + 1] = {0};
   // 常に1を出力する中間層のユニット初期化
@@ -204,11 +212,12 @@ int main(int argc, char *argv[]) {
   // 大きな値ならなんでもいい．平均二乗誤差
   double error = 100;
 
+  // ニューラルネットワークテスト用
+  double test_input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
+
   // 文字の種類ごとファイルから読み込み
-  for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-    sprintf(train_file_name, "Data/hira0_%02dL.dat", char_class);
-    fetch(input[char_class], train_file_name);
-  }
+  provide_data(input, 0, 'L');
+  provide_data(test_input, 0, 'T');
 
   // 重み初期化
   init_weight(INPUT_SIZE + 1, MIDDLE_SIZE, weight_middle);
@@ -241,19 +250,10 @@ int main(int argc, char *argv[]) {
   }
 
   // 識別する
-  // ニューラルネットワークテスト用
-  char test_file_name[256] = {'\0'};
-  double test_input[CHAR_CLASS][LETTER_NUM][INPUT_SIZE + 1] = {{{0}}};
-
   // 正解数
   int correct = 0;
   // 文字の種類ごと
   for (int char_class = 0; char_class < CHAR_CLASS; char_class++) {
-    // sprintf(test_file_name, "Data/hira0_%02dL.dat", char_class);
-    sprintf(test_file_name, "Data/hira0_%02dT.dat", char_class);
-    // ファイルから読み込み
-    fetch(test_input[char_class], test_file_name);
-
     // 分布確認用
     int histgram[CHAR_CLASS] = {0};
 
